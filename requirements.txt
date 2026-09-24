@@ -1,6 +1,13 @@
-streamlit
-pandas
-numpy
-scikit-learn
-xgboost
-joblib
+# CPU-only PyTorch wheels; without this index pip pulls the multi-GB CUDA build.
+--extra-index-url https://download.pytorch.org/whl/cpu
+
+streamlit==1.64.0
+pandas==3.0.6
+numpy==2.5.3
+scipy==1.18.1
+scikit-learn==1.9.1
+xgboost==3.4.1
+joblib==1.6.0
+shap==0.52.0
+torch==2.14.0+cpu
+matplotlib==3.11.2
