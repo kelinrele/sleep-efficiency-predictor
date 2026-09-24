@@ -45,6 +45,9 @@ def test_ensemble_contributions_sum_and_round_trip(dataset, raw, tmp_path):
     raw_sum = parts.sum(axis=1).to_numpy()
     np.testing.assert_allclose(ens.predict(test), np.clip(raw_sum, *ens.target_range_), atol=1e-6)
 
+    # Non-activity branches are centred on training users, so they read as shifts from typical.
+    assert abs(ens.predict_contributions(train)["habits"].mean()) < 1e-6
+
     ens.save(tmp_path / "net.pt")
     loaded = sn.SleepNetEnsemble.load(tmp_path / "net.pt")
     np.testing.assert_allclose(loaded.predict(test), ens.predict(test), atol=1e-6)

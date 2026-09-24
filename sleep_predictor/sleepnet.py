@@ -21,6 +21,7 @@ HISTORY_COLS = ["steps", "stress_score", d.TARGET, "alcohol_units", "caffeine_mg
 
 
 def set_seed(seed):
+    torch.set_num_threads(4)  # small networks slow down when threads oversubscribe the CPU
     random.seed(seed)
     np.random.seed(seed)
     torch.manual_seed(seed)
@@ -198,6 +199,12 @@ class SleepNetEnsemble:
             )
             self.models.append(model)
             self.curves.append(curve)
+        # A constant can sit in any branch, so the raw split between branches is arbitrary.
+        # Centre every non-activity branch on its training mean (moving the constant into the
+        # activity term), so "habits" means the shift from a typical training day.
+        self.offsets_ = {}
+        raw_parts = self._branches(train, raw)
+        self.offsets_ = {k: float(raw_parts[k].mean()) for k in raw_parts if k != "activity"}
         return self
 
     def _branches(self, frame, raw=None, model=None):
@@ -210,7 +217,11 @@ class SleepNetEnsemble:
                 # Fold the bias into the activity term so contributions sum to the prediction.
                 b["activity"] = b["activity"] + float(mdl.bias) / TARGET_SCALE
                 parts.append(b)
-        return pd.DataFrame({k: np.mean([p[k] for p in parts], axis=0) for k in parts[0]}, index=frame.index)
+        out = pd.DataFrame({k: np.mean([p[k] for p in parts], axis=0) for k in parts[0]}, index=frame.index)
+        for k, offset in getattr(self, "offsets_", {}).items():
+            out[k] -= offset
+            out["activity"] += offset
+        return out
 
     def predict_contributions(self, frame, raw=None):
         return self._branches(frame, raw)
@@ -235,6 +246,7 @@ class SleepNetEnsemble:
                 "act_scaler": self.act_scaler.state(),
                 "hab_scaler": self.hab_scaler.state(),
                 "hist_scaler": self.hist_scaler.state() if self.use_history else None,
+                "offsets": self.offsets_,
                 "states": [m.state_dict() for m in self.models],
             },
             path,
@@ -255,4 +267,5 @@ class SleepNetEnsemble:
             model.load_state_dict(state)
             model.eval()
             ens.models.append(model)
+        ens.offsets_ = dict(ckpt["offsets"])
         return ens
