@@ -1,58 +1,136 @@
-import streamlit as st
-import pandas as pd
-import numpy as np
-import joblib
+import json
+from pathlib import Path
 
-# Waking up the "Brain"
-sleep_model = joblib.load('sleep_model.joblib')
-sleep_scaler = joblib.load('sleep_scaler.joblib')
+import joblib
+import pandas as pd
+import streamlit as st
+
+from sleep_predictor import data as d
+from sleep_predictor import explain
+
+MODELS = Path(__file__).resolve().parent / "models"
+
+
+@st.cache_resource
+def load_model():
+    """Load the model chosen by train.py once per process."""
+    choice = json.loads((MODELS / "model_choice.json").read_text())
+    ranges = json.loads((MODELS / "feature_ranges.json").read_text())
+    if choice["model"] == "two_stage":
+        model = joblib.load(MODELS / "two_stage.joblib")
+    else:
+        from sleep_predictor.sleepnet import SleepNetEnsemble
+
+        model = SleepNetEnsemble.load(MODELS / "sleepnet.pt")
+    return choice, ranges, model
+
+
+def attributions(choice, model, ranges, row):
+    if choice["model"] == "two_stage":
+        return explain.two_stage_attributions(model, row)
+    # One typical training day (medians) as the Kernel SHAP reference point.
+    typical = pd.DataFrame([{f: ranges[f]["median"] for f in model.habit_features}])
+    return explain.sleepnet_attributions(model, row, typical, nsamples=100)
+
+
+choice, ranges, model = load_model()
+
+
+def bounds(feature):
+    r = ranges[feature]
+    return r["min"], r["max"], r["median"]
+
 
 st.title("Sleep Efficiency Predictor")
+st.info(
+    "**Not medical advice.** This is a modeling study. The model was trained on a synthetic "
+    "wearables dataset, so its outputs describe patterns in that data, not in real people. "
+    "Talk to a clinician about sleep concerns."
+)
 
-# 1. The Polished UI Inputs (in exact matrix order)
-user_steps = st.number_input("Daily Steps", min_value=0, max_value=50000, value=5000, step=500)
-user_alcohol = st.number_input("Alcohol Units", min_value=0, max_value=15, value=0)
+st.subheader("Today")
+lo, hi, mid = bounds("steps")
+steps = st.number_input("Daily steps", min_value=int(lo), max_value=int(hi), value=int(mid), step=500)
 
-# Human-readable 1-10 slider transformed into a 10-100 metric for the backend
-display_stress = st.slider("Stress Level (1 = Completely Relaxed, 10 = Max Stress)", min_value=1, max_value=10, value=5)
-user_stress = display_stress * 10
+lo, hi, mid = bounds("stress_score")
+stress = st.slider(
+    f"Stress score (the dataset's own {int(lo)}–{int(hi)} scale; higher means more stressed)",
+    min_value=int(lo), max_value=int(hi), value=int(mid),
+)
 
-user_caffeine = st.number_input("Caffeine (mg)", min_value=0, max_value=1000, value=100)
-user_workout_none = int(st.selectbox("Did you skip working out today?", ["No", "Yes"]) == "Yes")
-user_screen_time = st.number_input("Screen Time (minutes)", min_value=0, max_value=1440, value=120)
-user_workout_walk = int(st.selectbox("Did you go for a walk today?", ["No", "Yes"]) == "Yes")
+lo, hi, mid = bounds("alcohol_units")
+alcohol = st.slider("Alcohol (units)", min_value=0.0, max_value=round(hi, 1), value=0.0, step=0.1)
 
-# 2. Packaging the Payload
-# Packaging the payload as a DataFrame with explicit feature names to eliminate warnings
-user_data = pd.DataFrame([[
-    user_steps, 
-    user_alcohol, 
-    user_stress, 
-    user_caffeine, 
-    user_workout_none, 
-    user_screen_time, 
-    user_workout_walk
-]], columns=['steps', 'alcohol_units', 'stress_score', 'caffeine_mg', 'workout_type_none', 'screen_time_min', 'workout_type_walk'])
+lo, hi, mid = bounds("caffeine_mg")
+caffeine = st.slider("Caffeine (mg)", min_value=0, max_value=int(hi), value=int(mid), step=10)
 
-# 3. The Prediction Trigger
-if st.button("Predict Sleep Efficiency"):
-    
-    # Scale and Predict
-    scaled_data = sleep_scaler.transform(user_data)
-    prediction = sleep_model.predict(scaled_data)
-    
-    # Convert decimal to clean percentage
-    prediction_pct = prediction[0] * 100
-    
-    # Display the primary score
-    st.success(f"Your predicted sleep efficiency is: {prediction_pct:.0f}%")
-    
-    # 4. Human Interpretation Logic
-    if prediction_pct >= 90:
-        st.info("🟢 **Excellent:** You are getting highly restorative, deep sleep. Your habits are perfectly optimized.")
-    elif prediction_pct >= 80:
-        st.info("🟡 **Good:** You are getting standard, healthy rest, but there is room for minor habit optimizations.")
-    elif prediction_pct >= 70:
-        st.warning("🟠 **Fair:** Your sleep is somewhat compromised. Consider reducing stress, cutting late-night caffeine, or adding light activity.")
-    else:
-        st.error("🔴 **Poor:** Your deep sleep cycles are heavily disrupted. This usually correlates with high stress, alcohol, or extreme sedentariness.")
+lo, hi, mid = bounds("screen_time_min")
+screen = st.slider("Screen time (minutes)", min_value=int(lo), max_value=int(hi), value=int(mid), step=10)
+
+workout = st.selectbox(
+    "Workout type",
+    d.WORKOUT_TYPES,
+    format_func=lambda w: "No workout" if w == "none" else w.capitalize(),
+)
+
+with st.expander("Recent history (defaults are typical values from the training data)"):
+    lo, hi, mid = bounds("prev_sleep_eff")
+    prev_eff = st.slider("Last night's sleep efficiency (%)", min_value=int(round(lo * 100)),
+                         max_value=int(round(hi * 100)), value=int(round(mid * 100)))
+    lo, hi, mid = bounds("steps_7d")
+    steps_7d = st.number_input("Average daily steps over the past 7 days", min_value=int(lo),
+                               max_value=int(hi), value=int(mid), step=500)
+    lo, hi, mid = bounds("stress_7d")
+    stress_7d = st.slider("Average stress score over the past 7 days", min_value=int(lo),
+                          max_value=int(hi), value=int(mid))
+
+inputs = {
+    "steps": steps,
+    "alcohol_units": alcohol,
+    "stress_score": stress,
+    "caffeine_mg": caffeine,
+    "screen_time_min": screen,
+    "prev_sleep_eff": prev_eff / 100,
+    "steps_7d": steps_7d,
+    "stress_7d": stress_7d,
+    "workout_type": workout,
+}
+
+if st.button("Predict sleep efficiency", type="primary"):
+    row = d.make_row(inputs)
+    prediction = float(model.predict(row)[0])
+    parts = model.predict_contributions(row).iloc[0]
+    activity = parts["activity"]
+    habits = parts.drop("activity").sum()
+
+    st.metric("Predicted sleep efficiency", f"{prediction * 100:.0f}%")
+    left, right = st.columns(2)
+    left.metric("Activity (steps)", f"{activity * 100:.1f}%",
+                help="What the model predicts from today's steps alone.")
+    right.metric("Habits and history", f"{habits * 100:+.1f} pts",
+                 help="How your other inputs shift the prediction away from the steps-only value.")
+    if abs((activity + habits) - prediction) > 5e-4:
+        low, high = model.target_range_
+        st.caption(
+            f"Activity plus habits comes to {(activity + habits) * 100:.1f}%, but predictions are "
+            f"kept within {low * 100:.0f}–{high * 100:.0f}%, the range recorded in the training "
+            "data (the dataset caps sleep efficiency at 99%)."
+        )
+    attr = explain.combine_workout(attributions(choice, model, ranges, row)).iloc[0]
+    shown = {
+        "alcohol_units": f"{alcohol:.1f} units",
+        "stress_score": f"{stress}",
+        "caffeine_mg": f"{caffeine} mg",
+        "screen_time_min": f"{screen} min",
+        "workout_type": "no workout" if workout == "none" else workout,
+    }
+    st.subheader("What the model associates with this prediction")
+    for note in explain.advice(attr, shown, counterintuitive=choice["counterintuitive"]):
+        st.markdown(f"- {note}")
+
+    chart = (attr * 100).rename(lambda f: explain.LABELS.get(f, f)).sort_values()
+    st.bar_chart(chart, horizontal=True, x_label="Contribution (percentage points vs a typical day)")
+    st.caption(
+        "Contributions are associations learned from synthetic data, measured against a typical "
+        "training day. They are not causal effects."
+    )

@@ -1,0 +1,63 @@
+{
+  "two_stage": {
+    "activity_only_test_r2": 0.7175548051059896,
+    "habits_r2_on_test_residuals": 0.030559235760308723,
+    "full_test_r2": 0.7263166776121852
+  },
+  "sleepnet": {
+    "activity_only_test_r2": 0.716903847625252,
+    "habits_r2_on_test_residuals": 0.030544373045847784,
+    "full_test_r2": 0.7256157223370936
+  },
+  "joint_test_r2": 0.7261842288324031,
+  "habit_coefficients_pp_per_unit": {
+    "residual_stage2": {
+      "alcohol_units": -1.6878023867227476,
+      "stress_score": 0.002496285524959745,
+      "caffeine_mg": -0.00019210438801983378,
+      "screen_time_min": -0.00020966785236168012,
+      "workout_type_none": 0.02407024315431344,
+      "workout_type_walk": 0.08262226614866033,
+      "workout_type_run": -0.006664091191273185,
+      "workout_type_cycling": -0.11882371075324755,
+      "workout_type_strength": -0.05689857852918177,
+      "workout_type_yoga": -0.03172480246102192,
+      "workout_type_mixed": 0.12800155702077018,
+      "prev_sleep_eff": -0.30846487765038505,
+      "steps_7d": 8.557625498800626e-06,
+      "stress_7d": 0.0009053507266414034
+    },
+    "joint_with_steps_spline": {
+      "alcohol_units": -1.6832807477126306,
+      "stress_score": 0.0026844937898271217,
+      "caffeine_mg": -0.00018028942076516423,
+      "screen_time_min": -0.0001881354224633009,
+      "workout_type_none": 0.02738075527292387,
+      "workout_type_walk": 0.08259904529542805,
+      "workout_type_run": -0.01235093664287999,
+      "workout_type_cycling": -0.11753145295624096,
+      "workout_type_strength": -0.05541464361070171,
+      "workout_type_yoga": -0.031129125456279255,
+      "workout_type_mixed": 0.12347472978210888,
+      "prev_sleep_eff": -0.32878834160518866,
+      "steps_7d": 6.903307000653499e-06,
+      "stress_7d": 0.0006867962852780301
+    },
+    "with_linear_steps": {
+      "alcohol_units": -1.1725529908627517,
+      "stress_score": -0.027773882313106457,
+      "caffeine_mg": 0.002871761371144278,
+      "screen_time_min": 0.0023980620956804664,
+      "workout_type_none": -0.3059976785968545,
+      "workout_type_walk": 0.2753333025533172,
+      "workout_type_run": 0.4200276253434128,
+      "workout_type_cycling": -0.1389436256692416,
+      "workout_type_strength": -0.22325515747776645,
+      "workout_type_yoga": -0.27986772644207425,
+      "workout_type_mixed": 0.48214348211204716,
+      "prev_sleep_eff": 2.5456802592730523,
+      "steps_7d": 0.00016187836589343405,
+      "stress_7d": -0.013269500204581052
+    }
+  }
+}

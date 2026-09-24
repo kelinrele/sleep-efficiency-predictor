@@ -1,0 +1,16 @@
+feature,alignment,within_user_corr
+steps,day t-1,-0.0010192783608309044
+steps,day t,0.6790707882990843
+steps,day t+1,0.004212443091646189
+stress_score,day t-1,0.0002876228990544433
+stress_score,day t,-0.18993033682110075
+stress_score,day t+1,0.004976831670538506
+alcohol_units,day t-1,-0.00172440052230036
+alcohol_units,day t,-0.03886459529635689
+alcohol_units,day t+1,0.005388705499922364
+caffeine_mg,day t-1,-0.000257341771421202
+caffeine_mg,day t,-0.006334235072305011
+caffeine_mg,day t+1,-0.0007377345341996117
+screen_time_min,day t-1,0.014990527703308967
+screen_time_min,day t,0.009485255855913682
+screen_time_min,day t+1,-0.006323251883395673

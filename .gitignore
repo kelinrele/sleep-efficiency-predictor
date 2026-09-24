@@ -1,3 +1,14 @@
 *.csv
+!results/*.csv
 *.zip
 .ipynb_checkpoints/
+
+# local environments and data
+.venv/
+venv/
+data/
+
+# python caches
+__pycache__/
+*.pyc
+.pytest_cache/

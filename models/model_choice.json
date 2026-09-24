@@ -1,0 +1,13 @@
+{
+  "model": "two_stage",
+  "val_r2": {
+    "two_stage": 0.7718499276867268,
+    "sleepnet": 0.7706736180849265
+  },
+  "keep_gain": 0.002,
+  "two_stage_stage2": "ridge",
+  "sleepnet_variant": "SleepNet",
+  "counterintuitive": [
+    "stress_score"
+  ]
+}
