@@ -20,9 +20,11 @@ from sklearn.pipeline import Pipeline
 from sklearn.preprocessing import StandardScaler
 
 from sleep_predictor import data as d
+from sleep_predictor import explain
 from sleep_predictor import model as m
 from sleep_predictor import plotting as p
 from sleep_predictor.metrics import regression_report
+from sleep_predictor.sleepnet import SleepNetEnsemble
 
 ROOT = Path(__file__).resolve().parent
 RESULTS = ROOT / "results"
@@ -202,15 +204,199 @@ def choose_stage2(train, stage1):
     return xgb_params, info
 
 
+SEEDS = (0, 1, 2, 3, 4)
+SLEEPNET_VARIANTS = [
+    ("SleepNet", dict(use_history=False, penalty_weight=0.0)),
+    ("SleepNet + decorrelation penalty", dict(use_history=False, penalty_weight=5.0)),
+    ("SleepNet + GRU history", dict(use_history=True, penalty_weight=0.0)),
+]
+KEEP_GAIN = 0.002  # an extra branch or penalty is kept only if validation R2 improves this much
+
+
+def train_sleepnets(train, val, test, raw, ev):
+    """Fit each SleepNet variant over several seeds; report the seed spread and the ensemble."""
+    fitted = {}
+    for name, kwargs in SLEEPNET_VARIANTS:
+        ens = SleepNetEnsemble(d.ACTIVITY_FEATURES, STAGE2_FEATURES, **kwargs)
+        ens.fit(train, val, raw, seeds=SEEDS)
+        seed_r2 = [r2_score(test[d.TARGET], pr) for pr in ens.predict_each_seed(test, raw)]
+        ev.add_fitted(
+            name,
+            ens,
+            MODEL_FEATURES,
+            notes=f"single-seed test R2 {np.mean(seed_r2):.4f} ± {np.std(seed_r2, ddof=1):.4f} "
+                  f"over {len(SEEDS)} seeds; row is the seed ensemble",
+            predict=lambda frame, ens=ens: ens.predict(frame, raw),
+        )
+        fitted[name] = (ens, r2_score(val[d.TARGET], ens.predict(val, raw)))
+
+    base_name = SLEEPNET_VARIANTS[0][0]
+    base_val = fitted[base_name][1]
+    best_name = base_name
+    for name, (_, val_r2) in fitted.items():
+        if name != base_name and val_r2 - base_val >= KEEP_GAIN and val_r2 > fitted[best_name][1]:
+            best_name = name
+    info = {
+        "val_r2": {name: v for name, (_, v) in fitted.items()},
+        "keep_gain": KEEP_GAIN,
+        "chosen": best_name,
+    }
+    return fitted, info
+
+
+def plot_learning_curves(ens):
+    fig, ax = p.plt.subplots(figsize=(7, 3.8))
+    for i, curve in enumerate(ens.curves):
+        ax.plot(np.arange(1, len(curve) + 1), np.sqrt(curve), color=p.BLUE,
+                alpha=0.35 + 0.13 * i, linewidth=1.5, label="seeds" if i == 0 else None)
+        best = int(np.argmin(curve))
+        ax.scatter(best + 1, np.sqrt(curve[best]), s=36, color=p.ORANGE, zorder=3,
+                   edgecolors=p.SURFACE, linewidths=1.5,
+                   label="restored weights (best epoch)" if i == 0 else None)
+    # The first few epochs start far above the plateau; zoom on the region early stopping acts in.
+    best = min(np.sqrt(min(c)) for c in ens.curves)
+    ax.set_ylim(best - 0.1, best + 0.6)
+    ax.text(0.99, 0.02, "early epochs above this range are off-scale", transform=ax.transAxes,
+            ha="right", va="bottom", fontsize=8, color=p.TEXT_MUTED)
+    ax.set_xlabel("Epoch")
+    ax.set_ylabel("Validation RMSE (percentage points)")
+    ax.set_title("SleepNet training: early stopping on held-out users")
+    ax.legend(loc="upper right")
+    p.save(fig, FIGURES / "sleepnet_learning_curves.png")
+
+
+def variance_decomposition(two_stage, net, train, test, raw):
+    """How much steps explain alone, and how much habits explain of what steps leave over."""
+    y = test[d.TARGET].to_numpy()
+    parts = two_stage.predict_contributions(test)
+    resid = y - parts["activity"].to_numpy()
+    net_parts = net.predict_contributions(test, raw)
+    net_resid = y - net_parts["activity"].to_numpy()
+
+    # Fitting habits jointly with the steps spline (instead of on residuals) shows how much
+    # of each habit's association the steps stage absorbs when the two are correlated.
+    spline = two_stage.stage1_.named_steps["spline"]
+    basis_cols = [f"spline_{i}" for i in range(spline.n_features_out_)]
+
+    def with_basis(frame):
+        basis = pd.DataFrame(spline.transform(frame[d.ACTIVITY_FEATURES]), columns=basis_cols,
+                             index=frame.index)
+        return pd.concat([basis, frame[STAGE2_FEATURES]], axis=1)
+
+    joint = m.ridge_pipeline().fit(with_basis(train), train[d.TARGET])
+    joint_coefs = explain.ridge_coefficients(joint, basis_cols + STAGE2_FEATURES)[STAGE2_FEATURES]
+
+    # The same habits with steps entered as a straight line, as in the original notebook.
+    linear = m.ridge_pipeline().fit(train[MODEL_FEATURES], train[d.TARGET])
+    linear_coefs = explain.ridge_coefficients(linear, MODEL_FEATURES)[STAGE2_FEATURES]
+
+    return {
+        "two_stage": {
+            "activity_only_test_r2": float(r2_score(y, parts["activity"])),
+            "habits_r2_on_test_residuals": float(r2_score(resid, parts["habits"])),
+            "full_test_r2": float(r2_score(y, two_stage.predict(test))),
+        },
+        "sleepnet": {
+            "activity_only_test_r2": float(r2_score(y, net_parts["activity"])),
+            "habits_r2_on_test_residuals": float(
+                r2_score(net_resid, net_parts.drop(columns="activity").sum(axis=1))
+            ),
+            "full_test_r2": float(r2_score(y, net.predict(test, raw))),
+        },
+        "joint_test_r2": float(r2_score(y, joint.predict(with_basis(test)))),
+        "habit_coefficients_pp_per_unit": {
+            "residual_stage2": explain.ridge_coefficients(two_stage.stage2_, STAGE2_FEATURES).to_dict()
+            if "ridge" in two_stage.stage2_.named_steps else None,
+            "joint_with_steps_spline": joint_coefs.to_dict(),
+            "with_linear_steps": linear_coefs.to_dict(),
+        },
+    }
+
+
+def attribution_direction(attr, frame):
+    """Sign of the association between each feature's value and its attribution."""
+    out = {}
+    for c in attr.columns:
+        if frame[c].std() > 0 and attr[c].std() > 0:
+            out[c] = float(np.corrcoef(frame[c], attr[c])[0, 1])
+    return out
+
+
+def plot_attribution_summary(attr, frame, path, title):
+    """One row per feature: each dot is a test day's attribution, shaded by the input value."""
+    attr = explain.combine_workout(attr) * 100
+    order = attr.abs().mean().sort_values().index
+    fig, ax = p.plt.subplots(figsize=(7.4, 0.42 * len(order) + 1.4))
+    rng = np.random.default_rng(d.SEED)
+    cmap = p.matplotlib.colors.LinearSegmentedColormap.from_list("blue", ["#86b6ef", "#0d366b"])
+    for y, feature in enumerate(order):
+        values = attr[feature].to_numpy()
+        if feature == "workout_type":
+            shade = np.full(len(values), 0.6)
+        else:
+            raw_values = frame[feature].to_numpy()
+            span = np.ptp(raw_values) or 1.0
+            shade = (raw_values - raw_values.min()) / span
+        ax.scatter(values, y + rng.uniform(-0.28, 0.28, len(values)), c=shade, cmap=cmap,
+                   vmin=0, vmax=1, s=6, alpha=0.6, linewidths=0)
+    ax.set_yticks(range(len(order)), [explain.LABELS.get(f, f) for f in order])
+    ax.axvline(0, color=p.TEXT_MUTED, linewidth=0.8)
+    ax.set_xlabel("Contribution to predicted efficiency (percentage points, vs a typical day)")
+    ax.set_title(title)
+    ax.grid(axis="y", visible=False)
+    sm = p.plt.cm.ScalarMappable(cmap=cmap, norm=p.matplotlib.colors.Normalize(0, 1))
+    bar = fig.colorbar(sm, ax=ax, pad=0.01, fraction=0.03)
+    bar.set_ticks([0, 1], labels=["low", "high"])
+    bar.set_label("input value", color=p.TEXT_MUTED)
+    bar.outline.set_visible(False)
+    p.save(fig, path)
+
+
+def plot_importance(two_stage_attr, net_attr, path):
+    a = (explain.combine_workout(two_stage_attr) * 100).abs().mean()
+    b = (explain.combine_workout(net_attr) * 100).abs().mean()
+    order = (a + b).sort_values().index
+    y = np.arange(len(order))
+    fig, ax = p.plt.subplots(figsize=(7, 0.45 * len(order) + 1.4))
+    ax.barh(y + 0.2, a[order], height=0.36, color=p.BLUE, label="Two-stage (Stage 2)")
+    ax.barh(y - 0.2, b[order], height=0.36, color=p.ORANGE, label="SleepNet (habits branch)")
+    ax.set_yticks(y, [explain.LABELS.get(f, f) for f in order])
+    ax.set_xlabel("Mean |contribution| on test days (percentage points)")
+    ax.set_title("Habits and history: size of each input's contribution")
+    ax.legend(loc="lower right")
+    ax.grid(axis="y", visible=False)
+    p.save(fig, path)
+
+
+def plot_pred_vs_actual(test, pred, name, path):
+    fig, ax = p.plt.subplots(figsize=(5.6, 5.2))
+    ax.scatter(test[d.TARGET] * 100, np.asarray(pred) * 100, s=5, alpha=0.2, color=p.BLUE,
+               linewidths=0)
+    lims = [58, 101]
+    ax.plot(lims, lims, color=p.TEXT_MUTED, linewidth=1, linestyle="--", label="perfect prediction")
+    ax.set_xlim(lims)
+    ax.set_ylim(lims)
+    cap = test[d.TARGET].max() * 100
+    ax.annotate(f"days recorded at the {cap:.0f}% cap", xy=(cap, 86), xytext=(84, 64),
+                fontsize=8, color=p.TEXT_MUTED,
+                arrowprops=dict(arrowstyle="-", color=p.TEXT_MUTED, linewidth=0.8))
+    ax.set_xlabel("Actual sleep efficiency (%)")
+    ax.set_ylabel("Predicted sleep efficiency (%)")
+    ax.set_title(f"{name}: held-out users")
+    ax.legend(loc="upper left")
+    p.save(fig, path)
+
+
 def markdown_table(table):
     def fmt(col, v):
         if isinstance(v, float):
-            return f"{v:.4f}" if "r2" in col else f"{v:.2f}"
+            digits = 4 if "r2" in col else 2
+            return f"{round(v, digits) + 0.0:.{digits}f}"  # + 0.0 turns -0.0 into 0.0
         return str(v)
 
     lines = [
         "| " + " | ".join(table.columns) + " |",
-        "|" + "|".join("---" for _ in table.columns) + "|",
+        "| " + " | ".join("---" for _ in table.columns) + " |",
     ]
     for _, row in table.iterrows():
         lines.append("| " + " | ".join(fmt(c, row[c]) for c in table.columns) + " |")
@@ -279,7 +465,62 @@ def main():
         two_stage[name] = model
     joblib.dump(two_stage[stage2_info["chosen"]], MODELS / "two_stage.joblib")
 
+    print("SleepNet (5 seeds per variant)")
+    raw = d.load_raw()
+    sleepnets, sleepnet_info = train_sleepnets(train, val, test, raw, ev)
+    (RESULTS / "sleepnet_choice.json").write_text(json.dumps(sleepnet_info, indent=2))
+    plot_learning_curves(sleepnets[SLEEPNET_VARIANTS[0][0]][0])
+    best_net, _ = sleepnets[sleepnet_info["chosen"]]
+    best_net.save(MODELS / "sleepnet.pt")
+    print(f"  kept variant: {sleepnet_info['chosen']}")
+
     write_table(ev.table(), "results_table")
+
+    print("Interpretation")
+    chosen = two_stage[stage2_info["chosen"]]
+    decomposition = variance_decomposition(chosen, best_net, train, test, raw)
+    (RESULTS / "variance_decomposition.json").write_text(json.dumps(decomposition, indent=2))
+    for key in ("two_stage", "sleepnet"):
+        part = decomposition[key]
+        print(f"  {key}: steps alone R2 {part['activity_only_test_r2']:.4f}; habits explain "
+              f"{part['habits_r2_on_test_residuals'] * 100:.1f}% of the remaining variance")
+
+    sample = test.sample(n=200, random_state=d.SEED)
+    background = train.sample(n=100, random_state=d.SEED)
+    ts_attr = explain.two_stage_attributions(chosen, test)
+    net_attr = explain.sleepnet_attributions(best_net, sample, background)
+    plot_attribution_summary(ts_attr, test, FIGURES / "shap_summary_two_stage.png",
+                             "Two-stage model: habit and history contributions")
+    plot_attribution_summary(net_attr, sample, FIGURES / "shap_summary_sleepnet.png",
+                             "SleepNet habits branch: Kernel SHAP (200 test days)")
+    plot_importance(ts_attr.loc[sample.index], net_attr, FIGURES / "shap_importance.png")
+
+    directions = {
+        "two_stage": attribution_direction(ts_attr, test),
+        "sleepnet": attribution_direction(net_attr, sample),
+    }
+    (RESULTS / "attribution_directions.json").write_text(json.dumps(directions, indent=2))
+
+    # The app model is chosen on validation users; the test set plays no part in the choice.
+    val_r2 = {
+        "two_stage": float(r2_score(val[d.TARGET], chosen.predict(val))),
+        "sleepnet": float(r2_score(val[d.TARGET], best_net.predict(val, raw))),
+    }
+    app_model = "sleepnet" if val_r2["sleepnet"] - val_r2["two_stage"] >= KEEP_GAIN else "two_stage"
+    choice = {
+        "model": app_model,
+        "val_r2": val_r2,
+        "keep_gain": KEEP_GAIN,
+        "two_stage_stage2": stage2_info["chosen"],
+        "sleepnet_variant": sleepnet_info["chosen"],
+        "counterintuitive": explain.counterintuitive_features(directions[app_model]),
+    }
+    (MODELS / "model_choice.json").write_text(json.dumps(choice, indent=2))
+    print(f"  app model: {app_model} (val R2 {val_r2}); counterintuitive: {choice['counterintuitive']}")
+
+    app_pred = chosen.predict(test) if app_model == "two_stage" else best_net.predict(test, raw)
+    name = "Two-stage model" if app_model == "two_stage" else "SleepNet"
+    plot_pred_vs_actual(test, app_pred, name, FIGURES / "pred_vs_actual.png")
 
 
 if __name__ == "__main__":
