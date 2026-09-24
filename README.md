@@ -88,8 +88,8 @@ Written analysis: [results/findings.md](results/findings.md).
 - **The counterintuitive signs are artefacts.** The original project found caffeine and screen
   time associated with _higher_ efficiency. Those signs only appear when steps is modelled as a
   straight line. With the steps curve modelled, they become slightly negative and negligible.
-  Stress's negative association with sleep runs through steps, and once steps is known, stress
-  adds nothing.
+  Stress's negative association with sleep is accounted for by steps: once steps is known,
+  stress adds almost nothing.
 
 ### Key charts
 
@@ -169,8 +169,9 @@ tests/             unit tests on synthetic fixtures, plus app tests
   noise.
 - **The target is capped.** 18% of days sit at exactly 99%. A model that treats the cap as
   censoring (for example a Tobit-style likelihood) could estimate the upper range better.
-- **Row timing is inferred, not documented.** Each row is taken to pair a day's activity with
-  the night that follows it. That comes from the data, not from dataset documentation.
+- **Row timing is unknown.** Efficiency lines up with the same row's activity and with no
+  other day's, but that cannot show whether the night comes after the day or before it, and
+  the dataset does not say. Like the original project, the app assumes the night after.
 
 ## Next steps
 
