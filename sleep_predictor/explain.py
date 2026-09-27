@@ -93,7 +93,8 @@ def sleepnet_attributions(ens, frame, background, nsamples=200, seed=d.SEED):
 def counterintuitive_features(direction):
     """Features whose model direction (sign of the association) contradicts EXPECTED_SIGN."""
     return sorted(
-        f for f, expected in EXPECTED_SIGN.items()
+        f
+        for f, expected in EXPECTED_SIGN.items()
         if f in direction and np.sign(direction[f]) not in (0, expected)
     )
 

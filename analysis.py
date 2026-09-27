@@ -43,7 +43,11 @@ def timing_check(raw_train):
             valid = shifted.notna()
             x = within_user(shifted[valid], df.loc[valid, d.GROUP])
             rows.append(
-                {"feature": col, "alignment": label, "within_user_corr": float(np.corrcoef(eff[valid], x)[0, 1])}
+                {
+                    "feature": col,
+                    "alignment": label,
+                    "within_user_corr": float(np.corrcoef(eff[valid], x)[0, 1]),
+                }
             )
     return pd.DataFrame(rows)
 
@@ -73,12 +77,20 @@ def collinearity_with_steps(train):
 
 def grouped_cv_r2(train, features):
     model = XGBRegressor(
-        n_estimators=300, learning_rate=0.05, max_depth=3, subsample=0.8,
-        random_state=d.SEED, n_jobs=-1,
+        n_estimators=300,
+        learning_rate=0.05,
+        max_depth=3,
+        subsample=0.8,
+        random_state=d.SEED,
+        n_jobs=-1,
     )
     return cross_val_score(
-        model, train[features], train[d.TARGET], groups=train[d.GROUP],
-        cv=d.group_kfold(), scoring="r2",
+        model,
+        train[features],
+        train[d.TARGET],
+        groups=train[d.GROUP],
+        cv=d.group_kfold(),
+        scoring="r2",
     )
 
 
@@ -113,7 +125,9 @@ def plot_timing(timing):
     height = 0.26
     colors = {"day t-1": p.NEUTRAL, "day t": p.BLUE, "day t+1": p.ORANGE}
     for i, col in enumerate(pivot.columns):
-        ax.barh(y + (i - 1) * height, pivot[col], height=height - 0.03, color=colors[col], label=col)
+        ax.barh(
+            y + (i - 1) * height, pivot[col], height=height - 0.03, color=colors[col], label=col
+        )
     ax.set_yticks(y, pivot.index)
     ax.invert_yaxis()
     ax.axvline(0, color=p.TEXT_MUTED, linewidth=0.8)
@@ -135,8 +149,15 @@ def plot_collinearity(col):
     ax.set_title("How much each feature moves with steps")
     ax.grid(axis="y", visible=False)
     for y, v in enumerate(col["pooled_corr"]):
-        ax.text(v + (0.02 if v >= 0 else -0.02), y, f"{v:+.2f}", va="center",
-                ha="left" if v >= 0 else "right", fontsize=8, color=p.TEXT_MUTED)
+        ax.text(
+            v + (0.02 if v >= 0 else -0.02),
+            y,
+            f"{v:+.2f}",
+            va="center",
+            ha="left" if v >= 0 else "right",
+            fontsize=8,
+            color=p.TEXT_MUTED,
+        )
     p.save(fig, FIGURES / "collinearity_with_steps.png")
 
 
@@ -164,8 +185,12 @@ def main():
     print(col.round(3).to_string(index=False))
 
     stress = raw["stress_score"]
-    scale = {"min": int(stress.min()), "max": int(stress.max()), "median": float(stress.median()),
-             "integer_valued": bool((stress == stress.round()).all())}
+    scale = {
+        "min": int(stress.min()),
+        "max": int(stress.max()),
+        "median": float(stress.median()),
+        "integer_valued": bool((stress == stress.round()).all()),
+    }
     (RESULTS / "stress_scale.json").write_text(json.dumps(scale, indent=2))
     print(f"\nstress_score scale: {scale}")
 

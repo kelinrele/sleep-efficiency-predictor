@@ -50,12 +50,16 @@ st.info(
 
 st.subheader("Today")
 lo, hi, mid = bounds("steps")
-steps = st.number_input("Daily steps", min_value=int(lo), max_value=int(hi), value=int(mid), step=500)
+steps = st.number_input(
+    "Daily steps", min_value=int(lo), max_value=int(hi), value=int(mid), step=500
+)
 
 lo, hi, mid = bounds("stress_score")
 stress = st.slider(
     f"Stress score (the dataset's own {int(lo)}–{int(hi)} scale; higher means more stressed)",
-    min_value=int(lo), max_value=int(hi), value=int(mid),
+    min_value=int(lo),
+    max_value=int(hi),
+    value=int(mid),
 )
 
 lo, hi, mid = bounds("alcohol_units")
@@ -65,7 +69,9 @@ lo, hi, mid = bounds("caffeine_mg")
 caffeine = st.slider("Caffeine (mg)", min_value=0, max_value=int(hi), value=int(mid), step=10)
 
 lo, hi, mid = bounds("screen_time_min")
-screen = st.slider("Screen time (minutes)", min_value=int(lo), max_value=int(hi), value=int(mid), step=10)
+screen = st.slider(
+    "Screen time (minutes)", min_value=int(lo), max_value=int(hi), value=int(mid), step=10
+)
 
 workout = st.selectbox(
     "Workout type",
@@ -75,14 +81,27 @@ workout = st.selectbox(
 
 with st.expander("Recent history (defaults are typical values from the training data)"):
     lo, hi, mid = bounds("prev_sleep_eff")
-    prev_eff = st.slider("Last night's sleep efficiency (%)", min_value=int(round(lo * 100)),
-                         max_value=int(round(hi * 100)), value=int(round(mid * 100)))
+    prev_eff = st.slider(
+        "Last night's sleep efficiency (%)",
+        min_value=int(round(lo * 100)),
+        max_value=int(round(hi * 100)),
+        value=int(round(mid * 100)),
+    )
     lo, hi, mid = bounds("steps_7d")
-    steps_7d = st.number_input("Average daily steps over the past 7 days", min_value=int(lo),
-                               max_value=int(hi), value=int(mid), step=500)
+    steps_7d = st.number_input(
+        "Average daily steps over the past 7 days",
+        min_value=int(lo),
+        max_value=int(hi),
+        value=int(mid),
+        step=500,
+    )
     lo, hi, mid = bounds("stress_7d")
-    stress_7d = st.slider("Average stress score over the past 7 days", min_value=int(lo),
-                          max_value=int(hi), value=int(mid))
+    stress_7d = st.slider(
+        "Average stress score over the past 7 days",
+        min_value=int(lo),
+        max_value=int(hi),
+        value=int(mid),
+    )
 
 inputs = {
     "steps": steps,
@@ -105,10 +124,16 @@ if st.button("Predict sleep efficiency", type="primary"):
 
     st.metric("Predicted sleep efficiency", f"{prediction * 100:.0f}%")
     left, right = st.columns(2)
-    left.metric("Activity (steps)", f"{activity * 100:.1f}%",
-                help="What the model predicts from today's steps alone.")
-    right.metric("Habits and history", f"{habits * 100:+.1f} pts",
-                 help="How your other inputs shift the prediction away from the steps-only value.")
+    left.metric(
+        "Activity (steps)",
+        f"{activity * 100:.1f}%",
+        help="What the model predicts from today's steps alone.",
+    )
+    right.metric(
+        "Habits and history",
+        f"{habits * 100:+.1f} pts",
+        help="How your other inputs shift the prediction away from the steps-only value.",
+    )
     if abs((activity + habits) - prediction) > 5e-4:
         low, high = model.target_range_
         st.caption(
@@ -129,7 +154,9 @@ if st.button("Predict sleep efficiency", type="primary"):
         st.markdown(f"- {note}")
 
     chart = (attr * 100).rename(lambda f: explain.LABELS.get(f, f)).sort_values()
-    st.bar_chart(chart, horizontal=True, x_label="Contribution (percentage points vs a typical day)")
+    st.bar_chart(
+        chart, horizontal=True, x_label="Contribution (percentage points vs a typical day)"
+    )
     st.caption(
         "Contributions are associations learned from synthetic data, measured against a typical "
         "training day. They are not causal effects."

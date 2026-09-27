@@ -32,7 +32,9 @@ def test_history_windows_use_only_previous_days(raw):
     windows = sn.history_windows(raw, rows, scaler, days=7)
     steps_col = sn.HISTORY_COLS.index("steps")
     assert (windows[0] == 0).all()  # first day has no history
-    np.testing.assert_allclose(windows[1, -5:, steps_col], user.steps.iloc[0:5].to_numpy(), rtol=1e-5)
+    np.testing.assert_allclose(
+        windows[1, -5:, steps_col], user.steps.iloc[0:5].to_numpy(), rtol=1e-5
+    )
     assert (windows[1, :2] == 0).all()
     assert user.steps.iloc[5] not in windows[1, :, steps_col]
 

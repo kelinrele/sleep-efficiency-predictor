@@ -104,9 +104,7 @@ def grouped_split(df, test_size=0.15, val_size=0.15, seed=SEED):
     trainval_idx, test_idx = next(outer.split(df, groups=df[GROUP]))
     trainval = df.iloc[trainval_idx]
 
-    inner = GroupShuffleSplit(
-        n_splits=1, test_size=val_size / (1 - test_size), random_state=seed
-    )
+    inner = GroupShuffleSplit(n_splits=1, test_size=val_size / (1 - test_size), random_state=seed)
     train_idx, val_idx = next(inner.split(trainval, groups=trainval[GROUP]))
     train, val, test = (
         trainval.iloc[train_idx].copy(),

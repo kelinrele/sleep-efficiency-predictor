@@ -38,11 +38,7 @@ RANDOM_SPLIT_R2 = 0.7568
 def lasso_candidates(df):
     """Every numeric column that is not an ID, the target, or a leakage column."""
     excluded = set(d.LEAKAGE_COLS) | {d.TARGET, d.GROUP, "date", "mood_encoded"}
-    return [
-        c
-        for c in df.columns
-        if c not in excluded and pd.api.types.is_numeric_dtype(df[c])
-    ]
+    return [c for c in df.columns if c not in excluded and pd.api.types.is_numeric_dtype(df[c])]
 
 
 def grouped_lasso(train):
@@ -110,8 +106,10 @@ class Evaluator:
                 "notes": notes,
             }
         )
-        print(f"  {name:<40} val R2 {val['r2']:.4f}  test R2 {test['r2']:.4f}  "
-              f"RMSE {test['rmse_pp']:.2f} pp  MAE {test['mae_pp']:.2f} pp")
+        print(
+            f"  {name:<40} val R2 {val['r2']:.4f}  test R2 {test['r2']:.4f}  "
+            f"RMSE {test['rmse_pp']:.2f} pp  MAE {test['mae_pp']:.2f} pp"
+        )
         return model
 
     def table(self):
@@ -154,16 +152,34 @@ def plot_stage1(train, info):
     grid = pd.DataFrame({"steps": np.linspace(train.steps.min(), train.steps.max(), 300)})
 
     fig, ax = p.plt.subplots(figsize=(7, 4.2))
-    ax.scatter(sample.steps, sample[d.TARGET] * 100, s=5, alpha=0.18, color=p.NEUTRAL,
-               linewidths=0, label="training days (sample)")
-    ax.plot(grid.steps, linear.predict(grid) * 100, color=p.ORANGE, linewidth=2,
-            label=f"straight line (CV R² {info['linear_cv_r2']:.3f})")
-    ax.plot(grid.steps, spline.predict(grid) * 100, color=p.BLUE, linewidth=2,
-            label=f"spline (CV R² {info['spline_cv_r2']:.3f})")
+    ax.scatter(
+        sample.steps,
+        sample[d.TARGET] * 100,
+        s=5,
+        alpha=0.18,
+        color=p.NEUTRAL,
+        linewidths=0,
+        label="training days (sample)",
+    )
+    ax.plot(
+        grid.steps,
+        linear.predict(grid) * 100,
+        color=p.ORANGE,
+        linewidth=2,
+        label=f"straight line (CV R² {info['linear_cv_r2']:.3f})",
+    )
+    ax.plot(
+        grid.steps,
+        spline.predict(grid) * 100,
+        color=p.BLUE,
+        linewidth=2,
+        label=f"spline (CV R² {info['spline_cv_r2']:.3f})",
+    )
     cap = train[d.TARGET].max() * 100
     ax.axhline(cap, color=p.TEXT_MUTED, linewidth=0.8, linestyle="--")
-    ax.text(train.steps.min(), cap + 0.8, f"data capped at {cap:.0f}%", fontsize=8,
-            color=p.TEXT_MUTED)
+    ax.text(
+        train.steps.min(), cap + 0.8, f"data capped at {cap:.0f}%", fontsize=8, color=p.TEXT_MUTED
+    )
     ax.set_ylim(55, 106)
     ax.set_xlabel("Daily steps")
     ax.set_ylabel("Sleep efficiency (%)")
@@ -175,9 +191,7 @@ def plot_stage1(train, info):
 def choose_stage2(train, stage1):
     """Tune XGBoost on out-of-fold Stage 1 residuals and compare it with Ridge."""
     y, g = train[d.TARGET].to_numpy(), train[d.GROUP]
-    oof = cross_val_predict(
-        stage1, train[d.ACTIVITY_FEATURES], y, groups=g, cv=d.group_kfold()
-    )
+    oof = cross_val_predict(stage1, train[d.ACTIVITY_FEATURES], y, groups=g, cv=d.group_kfold())
     resid = y - oof
     X = train[STAGE2_FEATURES]
 
@@ -225,7 +239,7 @@ def train_sleepnets(train, val, test, raw, ev):
             ens,
             MODEL_FEATURES,
             notes=f"single-seed test R2 {np.mean(seed_r2):.4f} ± {np.std(seed_r2, ddof=1):.4f} "
-                  f"over {len(SEEDS)} seeds; row is the seed ensemble",
+            f"over {len(SEEDS)} seeds; row is the seed ensemble",
             predict=lambda frame, ens=ens: ens.predict(frame, raw),
         )
         fitted[name] = (ens, r2_score(val[d.TARGET], ens.predict(val, raw)))
@@ -247,17 +261,38 @@ def train_sleepnets(train, val, test, raw, ev):
 def plot_learning_curves(ens):
     fig, ax = p.plt.subplots(figsize=(7, 3.8))
     for i, curve in enumerate(ens.curves):
-        ax.plot(np.arange(1, len(curve) + 1), np.sqrt(curve), color=p.BLUE,
-                alpha=0.35 + 0.13 * i, linewidth=1.5, label="seeds" if i == 0 else None)
+        ax.plot(
+            np.arange(1, len(curve) + 1),
+            np.sqrt(curve),
+            color=p.BLUE,
+            alpha=0.35 + 0.13 * i,
+            linewidth=1.5,
+            label="seeds" if i == 0 else None,
+        )
         best = int(np.argmin(curve))
-        ax.scatter(best + 1, np.sqrt(curve[best]), s=36, color=p.ORANGE, zorder=3,
-                   edgecolors=p.SURFACE, linewidths=1.5,
-                   label="restored weights (best epoch)" if i == 0 else None)
+        ax.scatter(
+            best + 1,
+            np.sqrt(curve[best]),
+            s=36,
+            color=p.ORANGE,
+            zorder=3,
+            edgecolors=p.SURFACE,
+            linewidths=1.5,
+            label="restored weights (best epoch)" if i == 0 else None,
+        )
     # The first few epochs start far above the plateau; zoom on the region early stopping acts in.
     best = min(np.sqrt(min(c)) for c in ens.curves)
     ax.set_ylim(best - 0.1, best + 0.6)
-    ax.text(0.99, 0.02, "early epochs above this range are off-scale", transform=ax.transAxes,
-            ha="right", va="bottom", fontsize=8, color=p.TEXT_MUTED)
+    ax.text(
+        0.99,
+        0.02,
+        "early epochs above this range are off-scale",
+        transform=ax.transAxes,
+        ha="right",
+        va="bottom",
+        fontsize=8,
+        color=p.TEXT_MUTED,
+    )
     ax.set_xlabel("Epoch")
     ax.set_ylabel("Validation RMSE (percentage points)")
     ax.set_title("SleepNet training: early stopping on held-out users")
@@ -279,8 +314,9 @@ def variance_decomposition(two_stage, net, train, test, raw):
     basis_cols = [f"spline_{i}" for i in range(spline.n_features_out_)]
 
     def with_basis(frame):
-        basis = pd.DataFrame(spline.transform(frame[d.ACTIVITY_FEATURES]), columns=basis_cols,
-                             index=frame.index)
+        basis = pd.DataFrame(
+            spline.transform(frame[d.ACTIVITY_FEATURES]), columns=basis_cols, index=frame.index
+        )
         return pd.concat([basis, frame[STAGE2_FEATURES]], axis=1)
 
     joint = m.ridge_pipeline().fit(with_basis(train), train[d.TARGET])
@@ -305,8 +341,11 @@ def variance_decomposition(two_stage, net, train, test, raw):
         },
         "joint_test_r2": float(r2_score(y, joint.predict(with_basis(test)))),
         "habit_coefficients_pp_per_unit": {
-            "residual_stage2": explain.ridge_coefficients(two_stage.stage2_, STAGE2_FEATURES).to_dict()
-            if "ridge" in two_stage.stage2_.named_steps else None,
+            "residual_stage2": explain.ridge_coefficients(
+                two_stage.stage2_, STAGE2_FEATURES
+            ).to_dict()
+            if "ridge" in two_stage.stage2_.named_steps
+            else None,
             "joint_with_steps_spline": joint_coefs.to_dict(),
             "with_linear_steps": linear_coefs.to_dict(),
         },
@@ -337,8 +376,17 @@ def plot_attribution_summary(attr, frame, path, title):
             raw_values = frame[feature].to_numpy()
             span = np.ptp(raw_values) or 1.0
             shade = (raw_values - raw_values.min()) / span
-        ax.scatter(values, y + rng.uniform(-0.28, 0.28, len(values)), c=shade, cmap=cmap,
-                   vmin=0, vmax=1, s=6, alpha=0.6, linewidths=0)
+        ax.scatter(
+            values,
+            y + rng.uniform(-0.28, 0.28, len(values)),
+            c=shade,
+            cmap=cmap,
+            vmin=0,
+            vmax=1,
+            s=6,
+            alpha=0.6,
+            linewidths=0,
+        )
     ax.set_yticks(range(len(order)), [explain.LABELS.get(f, f) for f in order])
     ax.axvline(0, color=p.TEXT_MUTED, linewidth=0.8)
     ax.set_xlabel("Contribution to predicted efficiency (percentage points, vs a typical day)")
@@ -370,16 +418,22 @@ def plot_importance(two_stage_attr, net_attr, path):
 
 def plot_pred_vs_actual(test, pred, name, path):
     fig, ax = p.plt.subplots(figsize=(5.6, 5.2))
-    ax.scatter(test[d.TARGET] * 100, np.asarray(pred) * 100, s=5, alpha=0.2, color=p.BLUE,
-               linewidths=0)
+    ax.scatter(
+        test[d.TARGET] * 100, np.asarray(pred) * 100, s=5, alpha=0.2, color=p.BLUE, linewidths=0
+    )
     lims = [58, 101]
     ax.plot(lims, lims, color=p.TEXT_MUTED, linewidth=1, linestyle="--", label="perfect prediction")
     ax.set_xlim(lims)
     ax.set_ylim(lims)
     cap = test[d.TARGET].max() * 100
-    ax.annotate(f"days recorded at the {cap:.0f}% cap", xy=(cap, 86), xytext=(84, 64),
-                fontsize=8, color=p.TEXT_MUTED,
-                arrowprops=dict(arrowstyle="-", color=p.TEXT_MUTED, linewidth=0.8))
+    ax.annotate(
+        f"days recorded at the {cap:.0f}% cap",
+        xy=(cap, 86),
+        xytext=(84, 64),
+        fontsize=8,
+        color=p.TEXT_MUTED,
+        arrowprops=dict(arrowstyle="-", color=p.TEXT_MUTED, linewidth=0.8),
+    )
     ax.set_xlabel("Actual sleep efficiency (%)")
     ax.set_ylabel("Predicted sleep efficiency (%)")
     ax.set_title(f"{name}: held-out users")
@@ -415,14 +469,18 @@ def main():
 
     df = d.build_dataset()
     train, val, test = d.grouped_split(df)
-    print(f"rows: train {len(train)}, val {len(val)}, test {len(test)} | users: "
-          f"{train[d.GROUP].nunique()}/{val[d.GROUP].nunique()}/{test[d.GROUP].nunique()}")
+    print(
+        f"rows: train {len(train)}, val {len(val)}, test {len(test)} | users: "
+        f"{train[d.GROUP].nunique()}/{val[d.GROUP].nunique()}/{test[d.GROUP].nunique()}"
+    )
 
     print("Lasso feature selection (grouped CV, training users only)")
     coefs, alpha = grouped_lasso(train)
     coefs.to_csv(RESULTS / "lasso_features.csv", index=False)
-    print(f"  alpha {alpha:.5f}; kept {int(coefs.kept.sum())} of {len(coefs)}: "
-          f"{', '.join(coefs.loc[coefs.kept, 'feature'].head(12))}")
+    print(
+        f"  alpha {alpha:.5f}; kept {int(coefs.kept.sum())} of {len(coefs)}: "
+        f"{', '.join(coefs.loc[coefs.kept, 'feature'].head(12))}"
+    )
 
     d.save_feature_ranges(d.feature_ranges(train, MODEL_FEATURES), MODELS / "feature_ranges.json")
 
@@ -430,15 +488,19 @@ def main():
     stage1, stage1_info = choose_stage1(train)
     (RESULTS / "stage1_choice.json").write_text(json.dumps(stage1_info, indent=2))
     plot_stage1(train, stage1_info)
-    print(f"  spline CV R2 {stage1_info['spline_cv_r2']:.4f} vs straight line "
-          f"{stage1_info['linear_cv_r2']:.4f} -> {stage1_info['chosen']}")
+    print(
+        f"  spline CV R2 {stage1_info['spline_cv_r2']:.4f} vs straight line "
+        f"{stage1_info['linear_cv_r2']:.4f} -> {stage1_info['chosen']}"
+    )
 
     print("Stage 2: habits on out-of-fold residuals")
     xgb_params, stage2_info = choose_stage2(train, stage1)
     (RESULTS / "stage2_choice.json").write_text(json.dumps(stage2_info, indent=2))
-    print(f"  residual CV R2: XGBoost {stage2_info['residual_cv_r2_xgb']:.4f} "
-          f"(params {xgb_params}), Ridge {stage2_info['residual_cv_r2_ridge']:.4f} "
-          f"-> {stage2_info['chosen']}")
+    print(
+        f"  residual CV R2: XGBoost {stage2_info['residual_cv_r2_xgb']:.4f} "
+        f"(params {xgb_params}), Ridge {stage2_info['residual_cv_r2_ridge']:.4f} "
+        f"-> {stage2_info['chosen']}"
+    )
 
     print("Models (fit on train users, scored on held-out users)")
     ev = Evaluator(train, val, test)
@@ -482,17 +544,27 @@ def main():
     (RESULTS / "variance_decomposition.json").write_text(json.dumps(decomposition, indent=2))
     for key in ("two_stage", "sleepnet"):
         part = decomposition[key]
-        print(f"  {key}: steps alone R2 {part['activity_only_test_r2']:.4f}; habits explain "
-              f"{part['habits_r2_on_test_residuals'] * 100:.1f}% of the remaining variance")
+        print(
+            f"  {key}: steps alone R2 {part['activity_only_test_r2']:.4f}; habits explain "
+            f"{part['habits_r2_on_test_residuals'] * 100:.1f}% of the remaining variance"
+        )
 
     sample = test.sample(n=200, random_state=d.SEED)
     background = train.sample(n=100, random_state=d.SEED)
     ts_attr = explain.two_stage_attributions(chosen, test)
     net_attr = explain.sleepnet_attributions(best_net, sample, background)
-    plot_attribution_summary(ts_attr, test, FIGURES / "shap_summary_two_stage.png",
-                             "Two-stage model: habit and history contributions")
-    plot_attribution_summary(net_attr, sample, FIGURES / "shap_summary_sleepnet.png",
-                             "SleepNet habits branch: Kernel SHAP (200 test days)")
+    plot_attribution_summary(
+        ts_attr,
+        test,
+        FIGURES / "shap_summary_two_stage.png",
+        "Two-stage model: habit and history contributions",
+    )
+    plot_attribution_summary(
+        net_attr,
+        sample,
+        FIGURES / "shap_summary_sleepnet.png",
+        "SleepNet habits branch: Kernel SHAP (200 test days)",
+    )
     plot_importance(ts_attr.loc[sample.index], net_attr, FIGURES / "shap_importance.png")
 
     directions = {
@@ -516,7 +588,8 @@ def main():
         "counterintuitive": explain.counterintuitive_features(directions[app_model]),
     }
     (MODELS / "model_choice.json").write_text(json.dumps(choice, indent=2))
-    print(f"  app model: {app_model} (val R2 {val_r2}); counterintuitive: {choice['counterintuitive']}")
+    print(f"  app model: {app_model} (val R2 {val_r2})")
+    print(f"  counterintuitive: {choice['counterintuitive']}")
 
     app_pred = chosen.predict(test) if app_model == "two_stage" else best_net.predict(test, raw)
     name = "Two-stage model" if app_model == "two_stage" else "SleepNet"

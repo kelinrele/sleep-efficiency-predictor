@@ -58,7 +58,10 @@ def test_inputs_are_bounded_by_training_ranges(app):
     steps = widget(app, "number_input", "Daily steps")
     assert steps.max == int(ranges["steps"]["max"])
     stress = widget(app, "slider", "Stress score")
-    assert (stress.min, stress.max) == (int(ranges["stress_score"]["min"]), int(ranges["stress_score"]["max"]))
+    assert (stress.min, stress.max) == (
+        int(ranges["stress_score"]["min"]),
+        int(ranges["stress_score"]["max"]),
+    )
 
 
 def test_every_workout_type_predicts(app):

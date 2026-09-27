@@ -17,7 +17,14 @@ from torch import nn
 from . import data as d
 
 TARGET_SCALE = 100.0
-HISTORY_COLS = ["steps", "stress_score", d.TARGET, "alcohol_units", "caffeine_mg", "screen_time_min"]
+HISTORY_COLS = [
+    "steps",
+    "stress_score",
+    d.TARGET,
+    "alcohol_units",
+    "caffeine_mg",
+    "screen_time_min",
+]
 
 
 def set_seed(seed):
@@ -91,13 +98,13 @@ def history_windows(raw, rows, standardizer, days=7):
     per_user = {}
     for user, frame in raw.groupby(d.GROUP, sort=False):
         values = np.nan_to_num(standardizer.transform(frame[HISTORY_COLS].to_numpy()), nan=0.0)
-        per_user[user] = (dict(zip(frame["date"], range(len(frame)))), values)
-    for i, (user, date) in enumerate(zip(rows[d.GROUP], rows["date"])):
+        per_user[user] = (dict(zip(frame["date"], range(len(frame)), strict=True)), values)
+    for i, (user, date) in enumerate(zip(rows[d.GROUP], rows["date"], strict=True)):
         position, values = per_user[user]
         t = position[date]
-        window = values[max(0, t - days):t]
+        window = values[max(0, t - days) : t]
         if len(window):
-            out[i, days - len(window):] = window
+            out[i, days - len(window) :] = window
     return out
 
 
@@ -136,13 +143,15 @@ def train_one(
         model.train()
         order = torch.randperm(n, generator=generator)
         for start in range(0, n, batch_size):
-            idx = order[start:start + batch_size]
+            idx = order[start : start + batch_size]
             batch = [t[idx] for t in tensors_train]
             branches = model.branches(*batch)
             pred = model.bias + sum(branches.values())
             loss = loss_fn(pred, y_train[idx])
             if penalty_weight:
-                loss = loss + penalty_weight * decorrelation_penalty(branches["habits"], batch[0][:, 0])
+                loss = loss + penalty_weight * decorrelation_penalty(
+                    branches["habits"], batch[0][:, 0]
+                )
             optimiser.zero_grad()
             loss.backward()
             optimiser.step()
@@ -217,7 +226,9 @@ class SleepNetEnsemble:
                 # Fold the bias into the activity term so contributions sum to the prediction.
                 b["activity"] = b["activity"] + float(mdl.bias) / TARGET_SCALE
                 parts.append(b)
-        out = pd.DataFrame({k: np.mean([p[k] for p in parts], axis=0) for k in parts[0]}, index=frame.index)
+        out = pd.DataFrame(
+            {k: np.mean([p[k] for p in parts], axis=0) for k in parts[0]}, index=frame.index
+        )
         for k, offset in getattr(self, "offsets_", {}).items():
             out[k] -= offset
             out["activity"] += offset
@@ -231,7 +242,9 @@ class SleepNetEnsemble:
 
     def predict_each_seed(self, frame, raw=None):
         return [
-            np.clip(self._branches(frame, raw, model=mdl).sum(axis=1).to_numpy(), *self.target_range_)
+            np.clip(
+                self._branches(frame, raw, model=mdl).sum(axis=1).to_numpy(), *self.target_range_
+            )
             for mdl in self.models
         ]
 
@@ -255,7 +268,12 @@ class SleepNetEnsemble:
     @classmethod
     def load(cls, path):
         ckpt = torch.load(path, weights_only=True)
-        ens = cls(ckpt["activity_features"], ckpt["habit_features"], ckpt["use_history"], ckpt["penalty_weight"])
+        ens = cls(
+            ckpt["activity_features"],
+            ckpt["habit_features"],
+            ckpt["use_history"],
+            ckpt["penalty_weight"],
+        )
         ens.target_range_ = tuple(ckpt["target_range"])
         ens.act_scaler = Standardizer(**ckpt["act_scaler"])
         ens.hab_scaler = Standardizer(**ckpt["hab_scaler"])

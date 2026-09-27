@@ -17,14 +17,16 @@ def test_grouped_split_has_no_user_overlap(dataset):
 def test_grouped_split_is_reproducible(dataset):
     first = d.grouped_split(dataset)
     second = d.grouped_split(dataset)
-    for a, b in zip(first, second):
+    for a, b in zip(first, second, strict=True):
         assert set(a[d.GROUP]) == set(b[d.GROUP])
 
 
 def test_lag_features_ignore_same_day(raw):
     base = d.add_lag_features(raw)
     spiked = raw.copy()
-    row = spiked.index[(spiked.user_id == "U0001") & (spiked.date == spiked.date.min() + np.timedelta64(10, "D"))][0]
+    row = spiked.index[
+        (spiked.user_id == "U0001") & (spiked.date == spiked.date.min() + np.timedelta64(10, "D"))
+    ][0]
     spiked.loc[row, ["steps", "stress_score", "sleep_efficiency"]] = [99999, 999, 0.1]
     after = d.add_lag_features(spiked)
 
