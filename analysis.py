@@ -75,9 +75,9 @@ def collinearity_with_steps(train):
     return pd.DataFrame(rows).sort_values("pooled_corr", key=np.abs, ascending=False)
 
 
-def grouped_cv_r2(train, features):
+def grouped_cv_r2(train, features, n_estimators=300):
     model = XGBRegressor(
-        n_estimators=300,
+        n_estimators=n_estimators,
         learning_rate=0.05,
         max_depth=3,
         subsample=0.8,
@@ -94,12 +94,12 @@ def grouped_cv_r2(train, features):
     )
 
 
-def retest_dropped_features(train):
+def retest_dropped_features(train, n_estimators=300):
     base = d.ACTIVITY_FEATURES + d.HABIT_FEATURES + d.LAG_FEATURES
-    base_scores = grouped_cv_r2(train, base)
+    base_scores = grouped_cv_r2(train, base, n_estimators)
     rows = []
     for feature in d.RETEST_FEATURES:
-        scores = grouped_cv_r2(train, base + [feature])
+        scores = grouped_cv_r2(train, base + [feature], n_estimators)
         delta = scores - base_scores
         rows.append(
             {
