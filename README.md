@@ -120,7 +120,11 @@ scale (20–100 for training users), not a 1–10 slider multiplied by 10.
 
 ## Run it
 
-Python 3.12 or newer. `torch` comes from the CPU wheel index listed in `requirements.txt`.
+Python 3.12 or newer. There are two requirement files:
+
+- `requirements.txt` holds only what the app needs at runtime.
+- `requirements-dev.txt` adds torch (from the CPU wheel index), shap, matplotlib, pytest,
+  ruff and Jupyter for training, tests and notebooks.
 
 ```bash
 python -m venv .venv && source .venv/bin/activate
@@ -129,6 +133,7 @@ pip install -r requirements-dev.txt
 python analysis.py      # diagnostics -> results/, figures/
 python train.py         # all models, results table, interpretation -> results/, models/, figures/
 python -m pytest        # unit tests and app tests
+ruff check .           # lint (rules in pyproject.toml)
 streamlit run app.py
 ```
 
@@ -145,7 +150,10 @@ On Windows on ARM, `shap` and `streamlit` have no prebuilt wheels. Use WSL or an
 3. Under **Advanced settings**, choose Python 3.12.
 4. Paste the app's URL at the top of this README.
 
-The committed files in `models/` are all the app needs. It never reads the dataset.
+The committed files in `models/` are all the app needs. It never reads the dataset, and it
+installs only `requirements.txt`, without torch or shap. If a retrain ever picks SleepNet
+(`models/model_choice.json`), add the torch lines from `requirements-dev.txt` to
+`requirements.txt` before deploying.
 
 ## Repository layout
 
