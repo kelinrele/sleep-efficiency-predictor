@@ -7,8 +7,7 @@ with a Streamlit app that splits each prediction into an **activity** part and a
 > patterns in generated data, not in real people, and every relationship below is an
 > association, not a cause.
 
-**Live app:** _add your Streamlit Community Cloud link here after deploying (see
-[Deploy](#deploy))._
+**Live app:** https://sleep-efficiency-predictor-kyrfoqs9rgbpdtdrdz9bys.streamlit.app/
 
 ## Question
 
@@ -114,6 +113,10 @@ each prediction it shows:
 - the habits most associated with a lower prediction, from exact per-prediction attributions.
   Habits whose model direction contradicts common sleep guidance, stress in this model, are
   flagged as likely artefacts and never given as advice.
+
+An **About the model and training data** panel at the top describes the dataset, how the
+model was trained and tested, and its test accuracy. The figures are read from `results/`,
+so they update when the model is retrained.
 
 Every input is limited to the range seen in training users. Stress uses the dataset's own
 scale (20–100 for training users), not a 1–10 slider multiplied by 10.

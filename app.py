@@ -8,7 +8,12 @@ import streamlit as st
 from sleep_predictor import data as d
 from sleep_predictor import explain
 
-MODELS = Path(__file__).resolve().parent / "models"
+ROOT = Path(__file__).resolve().parent
+MODELS = ROOT / "models"
+RESULTS = ROOT / "results"
+DATASET_URL = (
+    "https://www.kaggle.com/datasets/mftnakrsu/health-wearables-stresssleep-tracking-syntc"
+)
 
 
 @st.cache_resource
@@ -33,7 +38,24 @@ def attributions(choice, model, ranges, row):
     return explain.sleepnet_attributions(model, row, typical, nsamples=100)
 
 
+@st.cache_resource
+def load_model_card(model_name, sleepnet_variant):
+    """Test-set scores and variance split for the deployed model, as written by train.py."""
+    table = pd.read_csv(RESULTS / "results_table.csv", keep_default_na=False)
+    if model_name == "two_stage":
+        row = table[table["notes"] == "chosen Stage 2"].iloc[0]
+    else:
+        row = table[table["model"] == sleepnet_variant].iloc[0]
+    original = table[table["model"].str.startswith("Original XGBoost")].iloc[0]
+    results = json.loads((RESULTS / "variance_decomposition.json").read_text())
+    alcohol = (results["habit_coefficients_pp_per_unit"]["residual_stage2"] or {}).get(
+        "alcohol_units"
+    )
+    return row, original, results[model_name], alcohol
+
+
 choice, ranges, model = load_model()
+card, original, split, alcohol_pp = load_model_card(choice["model"], choice["sleepnet_variant"])
 
 
 def bounds(feature):
@@ -42,11 +64,65 @@ def bounds(feature):
 
 
 st.title("Sleep Efficiency Predictor")
-st.info(
-    "**Not medical advice.** This is a modeling study. The model was trained on a synthetic "
-    "wearables dataset, so its outputs describe patterns in that data, not in real people. "
-    "Talk to a clinician about sleep concerns."
+st.caption(
+    f"Trained on a synthetic wearables dataset (300 people, 6 months of daily records) and "
+    f"tested on 45 people it never saw: typical error ±{card['test_mae_pp']:.1f} points."
 )
+
+with st.expander("About the model and training data"):
+    if choice["model"] == "two_stage":
+        habits_part = (
+            "a linear model" if choice["two_stage_stage2"] == "ridge" else "gradient-boosted trees"
+        )
+        model_text = (
+            f"**{card['model']}**. A curve on daily steps gives the *Activity* part, and "
+            f"{habits_part} of habits and recent history gives the *Habits* shift."
+        )
+    else:
+        model_text = (
+            "**SleepNet**, a neural network with separate branches for steps (*Activity*) "
+            "and for habits and recent history (*Habits*)."
+        )
+    alcohol_line = (
+        f" Alcohol is the only habit with a sizeable association: about "
+        f"{alcohol_pp:+.1f} points per unit."
+        if alcohol_pp is not None
+        else ""
+    )
+    st.markdown(
+        f"""
+**Training data**
+- [Health + Wearables + Stress/Sleep Tracking]({DATASET_URL}) on Kaggle: daily wearable records
+  for 300 people over 6 months. That comes to about 52,000 usable days after dropping incomplete
+  days and each person's first days, which have no history.
+- The dataset is **synthetic** (generated, not recorded from real people), so predictions
+  describe patterns in that generated data.
+- Sleep efficiency in the data runs from 60% to 99%, and about 18% of days sit exactly at the
+  99% cap, so predictions never go above 99%.
+
+**How it was trained and tested**
+- People were split into three groups: 210 to train on, 45 to choose between models, and 45
+  kept aside for the final test. Nobody appears in more than one group, so the test shows how
+  the model does for someone new.
+- Model: {model_text} It scored best on the 45 people used to choose between models;
+  gradient boosting and a neural network scored about the same.
+
+**Accuracy on the 45 test people**
+- R² **{card["test_r2"]:.3f}** (95% range {card["test_r2_ci_low"]:.2f} to
+  {card["test_r2_ci_high"]:.2f}). Typical error ±{card["test_mae_pp"]:.1f} points;
+  root-mean-square error {card["test_rmse_pp"]:.1f} points.
+- The project's original XGBoost model scores R² {original["test_r2"]:.3f} when tested the
+  same way. Its earlier 0.757 came from testing on people it had already seen.
+
+**What drives the predictions**
+- Steps alone explain R² {split["activity_only_test_r2"]:.2f}. Habits and recent history explain
+  {split["habits_r2_on_test_residuals"]:.0%} of what is left.{alcohol_line}
+
+**Limits**
+- Inputs are limited to the ranges seen in the training data.
+- The contributions shown are associations in the data, not causes.
+"""
+    )
 
 st.subheader("Today")
 lo, hi, mid = bounds("steps")
