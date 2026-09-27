@@ -25,9 +25,17 @@ def predict(at):
     return {m.label: m.value for m in at.metric}, " ".join(m.value for m in at.markdown)
 
 
-def test_disclaimer_visible_on_load(app):
-    assert "Not medical advice" in app.info[0].value
-    assert "synthetic" in app.info[0].value
+def test_training_data_described_on_load(app):
+    import pandas as pd
+
+    table = pd.read_csv(APP.parent / "results" / "results_table.csv", keep_default_na=False)
+    chosen = table[table["notes"] == "chosen Stage 2"].iloc[0]
+    assert "synthetic" in app.caption[0].value
+    about = next(e for e in app.expander if e.label.startswith("About the model"))
+    text = " ".join(m.value for m in about.markdown)
+    assert "synthetic" in text and "210" in text
+    assert f"{chosen['test_r2']:.3f}" in text  # accuracy is read from the results, not typed in
+    assert not app.info  # the medical-advice notice was removed on request
 
 
 def test_prediction_shows_activity_and_habits_split(app):
