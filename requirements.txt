@@ -1,6 +1,9 @@
-streamlit
-pandas
-numpy
-scikit-learn
-xgboost
-joblib
+# What the Streamlit app needs at runtime. Training, tests and notebooks use
+# requirements-dev.txt, which adds torch, shap and matplotlib.
+streamlit==1.64.0
+pandas==3.0.6
+numpy==2.5.3
+scipy==1.18.1
+scikit-learn==1.9.1
+xgboost==3.4.1
+joblib==1.6.0

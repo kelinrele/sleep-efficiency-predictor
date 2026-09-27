@@ -1,0 +1,34 @@
+{
+  "two_stage": {
+    "alcohol_units": -1.0,
+    "stress_score": 1.0,
+    "caffeine_mg": -1.0,
+    "screen_time_min": -0.9999999999999997,
+    "workout_type_none": 0.9999999999999999,
+    "workout_type_walk": 0.9999999999999974,
+    "workout_type_run": -1.0,
+    "workout_type_cycling": -1.0,
+    "workout_type_strength": -0.9999999999999986,
+    "workout_type_yoga": -0.9999999999999989,
+    "workout_type_mixed": 1.0,
+    "prev_sleep_eff": -0.9999999999999993,
+    "steps_7d": 1.0,
+    "stress_7d": 1.0
+  },
+  "sleepnet": {
+    "alcohol_units": -0.9951971247680289,
+    "stress_score": 0.5038304931068549,
+    "caffeine_mg": -0.19347581168283381,
+    "screen_time_min": -0.8654412312996275,
+    "workout_type_none": 0.9409954897243586,
+    "workout_type_walk": 0.9843087445681058,
+    "workout_type_run": 0.9890337534675252,
+    "workout_type_cycling": 0.17776872487087186,
+    "workout_type_strength": 0.966618950036693,
+    "workout_type_yoga": 0.836655710773022,
+    "workout_type_mixed": 0.9870394128910934,
+    "prev_sleep_eff": -0.8643881158800502,
+    "steps_7d": 0.4241055199689457,
+    "stress_7d": -0.31466298779636376
+  }
+}

@@ -1,0 +1,15 @@
+-r requirements.txt
+
+# CPU-only PyTorch wheels; without this index pip pulls the multi-GB CUDA build.
+--extra-index-url https://download.pytorch.org/whl/cpu
+
+# Training and interpretation
+torch==2.14.0+cpu
+shap==0.52.0
+matplotlib==3.11.2
+
+# Tests, linting and notebooks
+pytest==9.1.1
+ruff==0.16.9
+nbformat==5.11.1
+jupyter==1.1.1

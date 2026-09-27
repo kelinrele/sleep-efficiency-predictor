@@ -1,0 +1,9 @@
+{
+  "val_r2": {
+    "SleepNet": 0.7706736180849265,
+    "SleepNet + decorrelation penalty": 0.7706997394444152,
+    "SleepNet + GRU history": 0.7705341807447863
+  },
+  "keep_gain": 0.002,
+  "chosen": "SleepNet"
+}

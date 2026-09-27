@@ -1,0 +1,10 @@
+[tool.ruff]
+line-length = 100
+extend-exclude = ["notebooks"]
+
+[tool.ruff.lint]
+# pyflakes, pycodestyle, import order, bugbear, pyupgrade
+select = ["F", "E", "W", "I", "B", "UP"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]

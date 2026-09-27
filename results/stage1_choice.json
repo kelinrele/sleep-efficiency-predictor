@@ -1,0 +1,6 @@
+{
+  "spline_cv_r2": 0.754697294208339,
+  "linear_cv_r2": 0.6993766702122708,
+  "min_gain": 0.002,
+  "chosen": "spline"
+}

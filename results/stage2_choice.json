@@ -1,0 +1,13 @@
+{
+  "residual_cv_r2_xgb": 0.018507262352082,
+  "residual_cv_r2_ridge": 0.019113557134152526,
+  "min_gain": 0.01,
+  "chosen": "ridge",
+  "xgb_params": {
+    "max_depth": 2,
+    "learning_rate": 0.03,
+    "min_child_weight": 20,
+    "reg_lambda": 5.0,
+    "n_estimators": 116
+  }
+}

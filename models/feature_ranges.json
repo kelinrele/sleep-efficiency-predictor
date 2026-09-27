@@ -1,0 +1,77 @@
+{
+  "steps": {
+    "min": 200.0,
+    "max": 28589.0,
+    "median": 8812.0
+  },
+  "alcohol_units": {
+    "min": 0.0,
+    "max": 2.757250670125807,
+    "median": 0.30633038360804915
+  },
+  "stress_score": {
+    "min": 20.0,
+    "max": 100.0,
+    "median": 67.0
+  },
+  "caffeine_mg": {
+    "min": 0.0,
+    "max": 474.8114274809792,
+    "median": 146.76639540035592
+  },
+  "screen_time_min": {
+    "min": 30.0,
+    "max": 602.472070209639,
+    "median": 238.8113255175054
+  },
+  "workout_type_none": {
+    "min": 0.0,
+    "max": 1.0,
+    "median": 0.0
+  },
+  "workout_type_walk": {
+    "min": 0.0,
+    "max": 1.0,
+    "median": 0.0
+  },
+  "workout_type_run": {
+    "min": 0.0,
+    "max": 1.0,
+    "median": 0.0
+  },
+  "workout_type_cycling": {
+    "min": 0.0,
+    "max": 1.0,
+    "median": 0.0
+  },
+  "workout_type_strength": {
+    "min": 0.0,
+    "max": 1.0,
+    "median": 0.0
+  },
+  "workout_type_yoga": {
+    "min": 0.0,
+    "max": 1.0,
+    "median": 0.0
+  },
+  "workout_type_mixed": {
+    "min": 0.0,
+    "max": 1.0,
+    "median": 0.0
+  },
+  "prev_sleep_eff": {
+    "min": 0.6,
+    "max": 0.99,
+    "median": 0.883144527549709
+  },
+  "steps_7d": {
+    "min": 1139.7142857142858,
+    "max": 20677.571428571428,
+    "median": 9093.571428571428
+  },
+  "stress_7d": {
+    "min": 42.0,
+    "max": 94.85714285714286,
+    "median": 66.85714285714286
+  }
+}
